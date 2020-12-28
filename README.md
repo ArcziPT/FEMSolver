@@ -1,7 +1,7 @@
 # FEM Solver
 
 Finite Element Method implementation for variational characterization of equation:
-![image](eq.png?raw=true "equation")
+![alt text](eq.png?raw=true "equation")
 Where:
 ```
 u - unknown function
@@ -25,7 +25,7 @@ a, b, c - user provided coefficients
 
 ### Usage
 This example solves equation:
-![image](ex_eq.png?raw=true "equation")
+![alt text](ex_eq.png?raw=true "equation")
 
 Include header `"FEM.h"`.
 
