@@ -19,11 +19,11 @@ int main(){
     };
 
     MES::Problem<float4> prob(a, b, c, f);
-    auto res = prob.solve(1000, 0, 1, left, right);
+    auto res = prob.solve(100, 0, 1, left, right);
 
     //std::cout<<res;
 
-    res.plot("pliczek", 1000);
+    res.plot("file", 1000);
 
     return 0;
 }
