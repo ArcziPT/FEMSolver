@@ -1,5 +1,5 @@
-#ifndef MES_H
-#define MES_H
+#ifndef FEM_H
+#define FEM_H
 
 #include <functional>
 #include <vector>
@@ -15,7 +15,7 @@
 
 #include <iostream>
 
-namespace MES{
+namespace FEM{
     template<typename T>
     using F = std::function<T (T)>;
 
@@ -72,7 +72,7 @@ namespace MES{
             };
         };
 
-        MES::Basis<T> basis;
+        FEM::Basis<T> basis;
 
         basis.push_back(BasisF<T>([x0, h](T x) -> T{
                 if(x < x0)
@@ -210,7 +210,7 @@ namespace MES{
     };
 
     /**
-     * MES:
+     * FEM:
      * (a(x)*u'(x))' + b(x)*u'(x) + c(x)*u(x) = f(x)
      */
     template <typename T>
@@ -353,7 +353,7 @@ namespace MES{
 
         std::tuple<T, T, T, T, bool, bool> get_coefficients(Basis<T>& basis, const BV<T>& left, const BV<T>& right){
             /**
-             * MES:
+             * FEM:
              * (a(x)*u'(x))' + b(x)*u'(x) + c(x)*u(x) = f(x)
              * a(xn)*u'(xn)*v(xn) - a(x0)*u'(x0)*v(x0) + Int(...) = Int(...)
              * C1*a(xn)*u(xn)*v(xn) + C2*a(x0)*u(x0)*v(x0) + Int(...) = Int(...) + C3*a(xn)*v(xn) + C4*a(x0)*v(x0)
@@ -418,11 +418,11 @@ namespace MES{
 
 using float4 = boost::multiprecision::cpp_bin_float_quad;
 
-MES::F<float4> F4;
-MES::Basis<float4> B4;
+FEM::F<float4> F4;
+FEM::Basis<float4> B4;
 
-template class MES::BasisF<float4>;
-template class MES::Result<float4>;
-template class MES::Problem<float4>;
+template class FEM::BasisF<float4>;
+template class FEM::Result<float4>;
+template class FEM::Problem<float4>;
 
 #endif
