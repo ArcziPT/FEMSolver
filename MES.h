@@ -4,12 +4,14 @@
 #include <functional>
 #include <vector>
 #include <boost/math/quadrature/gauss.hpp>
-#include <boost/numeric/ublas/matrix.hpp>
-#include <boost/numeric/ublas/lu.hpp>
-#include <boost/numeric/ublas/io.hpp>
-
 #include <boost/multiprecision/cpp_bin_float.hpp>
-using float4 = boost::multiprecision::cpp_bin_float_quad;
+
+#include <eigen3/Eigen/Core>
+#include <eigen3/Eigen/LU>
+
+#include <random>
+
+#include "matplotlibcpp.h"
 
 #include <iostream>
 
@@ -135,24 +137,84 @@ namespace MES{
         }
     };
 
-    namespace ublas = boost::numeric::ublas;
+    // namespace ublas = boost::numeric::ublas;
+    // template <typename T>
+    // bool InvertMatrix (const Eigen::Matrix<T>& input, ublas::matrix<T>& inverse) {
+    //     using namespace boost::numeric::ublas;
+    //     typedef permutation_matrix<std::size_t> pmatrix;
+    //     // create a working copy of the input
+    //     matrix<T> A(input);
+    //     // create a permutation matrix for the LU-factorization
+    //     pmatrix pm(A.size1());
+    //     // perform LU-factorization
+    //     int res = lu_factorize(A,pm);
+    //         if( res != 0 ) return false;
+    //     // create identity matrix of "inverse"
+    //     inverse.assign(ublas::identity_matrix<T>(A.size1()));
+    //     // backsubstitute to get the inverse
+    //     lu_substitute(A, pm, inverse);
+    //     return true;
+    // }
+
     template <typename T>
-    bool InvertMatrix (const ublas::matrix<T>& input, ublas::matrix<T>& inverse) {
-        using namespace boost::numeric::ublas;
-        typedef permutation_matrix<std::size_t> pmatrix;
-        // create a working copy of the input
-        matrix<T> A(input);
-        // create a permutation matrix for the LU-factorization
-        pmatrix pm(A.size1());
-        // perform LU-factorization
-        int res = lu_factorize(A,pm);
-            if( res != 0 ) return false;
-        // create identity matrix of "inverse"
-        inverse.assign(ublas::identity_matrix<T>(A.size1()));
-        // backsubstitute to get the inverse
-        lu_substitute(A, pm, inverse);
-        return true;
-    }
+    class Result{
+    public:
+        Result(const Eigen::Matrix<T, Eigen::Dynamic, 1>& w, const Basis<T>& basis): w(w), basis(basis) {}
+
+        void plot(const std::string& path, int pts){
+            auto n = basis.size() - 1;
+            auto a = (double) basis[0].a;
+            auto b = (double) basis[n].b;
+            auto h = (double) (b-a)/n;
+
+            auto f = [this, h, a, n](double x) -> double{
+                auto i = (int) ((x-a)/h);
+
+                auto tx = (T) x;
+
+                auto r = w(i) * basis[i].f(tx);
+                r += (i+1 <= n) ? w(i+1) * basis[i+1].f(tx) : 0;
+
+                return (double) r;
+            };
+
+            std::random_device rd;
+            std::mt19937 e2(rd());
+
+            std::uniform_real_distribution<double> dist(a, b);
+
+            std::vector<double> x(pts, 0);
+            std::vector<double> y(pts, 0);
+            for(int i=0; i<pts; i++){
+                x[i] = dist(e2);
+                y[i] = f(x[i]);
+            }
+
+            matplotlibcpp::scatter(x, y);
+
+            x = std::vector<double>(n+1, 0);
+            y = std::vector<double>(n+1, 0);
+            for(int i=0; i<=n; i++){
+                x[i] = a + i*h;
+                y[i] = f(x[i]);
+            }
+
+            //std::map<std::string, std::string> params = {{"m", "ro"}};
+            matplotlibcpp::scatter(x, y, 10);
+
+            matplotlibcpp::save(path);
+            matplotlibcpp::show();
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const Result<T>& result){
+            os<<std::setprecision(std::numeric_limits<T>::max_digits10)<<result.w<<std::endl;
+            return os;
+        }
+
+    private:
+        Eigen::Matrix<T, Eigen::Dynamic, 1> w;
+        Basis<T> basis;
+    };
 
     /**
      * MES:
@@ -164,7 +226,7 @@ namespace MES{
         Problem(F<T>& a, const F<T>& b, const F<T>& c, const F<T>& f): 
                 a(a), b(b), c(c), f(f) {}
 
-        void solve(int n, T a, T b, const BV<T>& left, const BV<T>& right){
+        Result<T> solve(int n, T a, T b, const BV<T>& left, const BV<T>& right){
             auto basis = generate_basis<T>(n, a, b);
 
             auto mul = [](const F<T>& u, const F<T>& v) -> auto{
@@ -277,9 +339,9 @@ namespace MES{
                 return i + r1 + r2;
             };
 
-            boost::numeric::ublas::matrix<T> M(n+1, n+1);
-            for(int i=0; i<=n; i++){
-                for(int j=0; j<=n; j++){
+            Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> M(n+1, n+1);
+            for(int j=0; j<=n; j++){
+                for(int i=0; i<=n; i++){
                     if((i == 0 || j == 0) && l_dirichlet){
                         if(i == j)
                             M(j, i) = 1;
@@ -295,9 +357,8 @@ namespace MES{
                         M(j, i) = B(basis[i], basis[j]);
                 }
             }
-            std::cout<<M<<std::endl;
 
-            boost::numeric::ublas::vector<T> K(n+1);
+            Eigen::Matrix<T, Eigen::Dynamic, 1> K(n+1);
             for(int i=0; i<=n; i++){
                 if(i == 0 && l_dirichlet)
                     K(i) = 0;
@@ -306,12 +367,19 @@ namespace MES{
                 else
                     K(i) = L(basis[i]);
             }
-            std::cout<<K<<std::endl;
 
-            boost::numeric::ublas::matrix<T> MI(n+1, n+1);
-            InvertMatrix(M, MI);
+            Eigen::Matrix<T, Eigen::Dynamic, 1> w = M.inverse()*K;
 
-            std::cout<<std::setprecision(std::numeric_limits<T>::max_digits10)<<boost::numeric::ublas::prod(MI, K)<<std::endl;
+            if(l_dirichlet){
+                basis[0] = ud;
+                w(0) = 1;
+            }
+            if(r_dirichlet){
+                basis[n] = ud;
+                w(n) = 1;
+            }
+
+            return Result<T>(w, basis);
         }
 
     private:
@@ -322,10 +390,13 @@ namespace MES{
     };
 }
 
+using float4 = boost::multiprecision::cpp_bin_float_quad;
+
 MES::F<float4> F4;
 MES::Basis<float4> B4;
 
 template class MES::BasisF<float4>;
+template class MES::Result<float4>;
 template class MES::Problem<float4>;
 
 #endif
